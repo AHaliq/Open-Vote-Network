@@ -45,15 +45,6 @@ type FieldSelector =
 | VoteStart
 | VoteEnd
 
-type AdvanceSetupFails =
-| NoSignupEnd
-| NoVoteStart
-| NoVoteEnd
-| TseBefTvs
-| TvsBefTve
-| TceBefTvs
-| TceAftTse
-
 (***************************************************)
 (*             The contract definition             *)
 (***************************************************)
@@ -288,3 +279,5 @@ transition advance_from_setup()
   event e
   end
 end
+
+(* signup_round transitions *)
