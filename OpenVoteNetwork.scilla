@@ -181,10 +181,6 @@ procedure voter_action_aux(is_add : Bool, voter : ByStr20)
   end
 end
 
-procedure advance_from_setup_success(is_commit_round : Bool)
-  
-end
-
 (***************************************************)
 (*                   Transitions                   *)
 (***************************************************)
