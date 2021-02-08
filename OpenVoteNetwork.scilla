@@ -1,0 +1,148 @@
+(* OpenVoteNetwork contract *)
+
+(***************************************************)
+(*                 Scilla version                  *)
+(***************************************************)
+
+scilla_version 0
+
+(***************************************************)
+(*               Associated library                *)
+(***************************************************)
+import IntUtils
+library OpenVoteNetwork
+
+let not_owner_code  = Uint32 1
+let action_not_valid_in_current_round_code = Uint32 2
+let setup_define_t_signup_end_code  = Uint32 3
+let setup_define_t_commit_end_code  = Uint32 4
+let setup_define_t_vote_start_code  = Uint32 5
+let setup_define_t_vote_end_code  = Uint32 6
+
+let setup_round = Uint32 0
+let signup_round = Uint32 1
+let commit_round = Uint32 2
+let vote_round = Uint32 3
+let tally_round = Uint32 4
+
+type FieldSelector =
+| SignupEnd
+| CommitEnd
+| VoteStart
+| VoteEnd
+
+(* aux function to calculate t event code pair when setting t in setup round *)
+let set_t =
+  fun (owner : ByStr20) =>
+  fun (sender : ByStr20) =>
+  fun (t : Uint32) =>
+  fun (relative_to_creation : Bool) =>
+  fun (t0v: BNum) =>
+  fun (r : Uint32) =>
+  fun (success_code: Uint32) =>
+    let is_owner = builtin eq owner sender in
+    let nil = None {BNum} in
+    match is_owner with
+    | False => 
+      Pair {(Option BNum) Uint32} nil not_owner_code
+    | True =>
+      let is_setup_round = builtin eq r setup_round in
+      match is_setup_round with
+      | True =>
+        let b0 = BNum 0 in
+        let t_new = match relative_to_creation with
+        | True => builtin badd t0v t
+        | False => builtin badd b0 t
+        end in
+        let v = Some {BNum} t_new in
+        Pair {(Option BNum) Uint32} v success_code
+      | False =>
+        Pair {(Option BNum) Uint32} nil action_not_valid_in_current_round_code
+      end
+    end
+
+(***************************************************)
+(*             The contract definition             *)
+(***************************************************)
+
+contract OpenVoteNetwork
+(owner: ByStr20)
+
+field round : Uint32 = setup_round
+field voters : Map ByStr20 String = Emp ByStr20 String
+
+field t0 : BNum = _creation_block
+field t_signup_end : Option BNum = None {BNum}
+field t_commit_end : Option BNum = None {BNum}
+field t_vote_start : Option BNum = None {BNum}
+field t_vote_end : Option BNum = None {BNum}
+
+
+(***************************************************)
+(*                   Procedures                    *)
+(***************************************************)
+
+(* setup_round procedures *)
+
+procedure setup_define_t_aux(field_selector : FieldSelector, x : Uint32, relative_to_creation : Bool)
+  t0v <- t0;
+  r <- round;
+  p = set_t owner _sender x relative_to_creation t0v r setup_define_t_signup_end_code;
+  match p with
+  | Pair v ec =>
+    match v with
+    | None => 
+    | v => 
+      match field_selector with
+      | SignupEnd => t_signup_end := v
+      | CommitEnd => t_commit_end := v
+      | VoteStart => t_vote_start := v
+      | VoteEnd => t_vote_end := v
+      end;
+      match field_selector with
+      | SignupEnd =>
+        e = {_eventname : "setup_define_t_signup_end"; code : ec};
+        event e
+      | CommitEnd =>
+        e = {_eventname : "setup_define_t_commit_end"; code : ec};
+        event e
+      | VoteStart =>
+        e = {_eventname : "setup_define_t_vote_start"; code : ec};
+        event e
+      | VoteEnd =>
+        e = {_eventname : "setup_define_t_vote_end"; code : ec};
+        event e
+      end
+    end
+  end
+end
+
+(***************************************************)
+(*                   Transitions                   *)
+(***************************************************)
+
+(* setup_round transitions *)
+
+transition setup_define_t_signup_end(x : Uint32, relative_to_creation : Bool)
+  s = SignupEnd;
+  setup_define_t_aux s x relative_to_creation
+end
+
+transition setup_define_t_commit_end(x : Uint32, relative_to_creation : Bool)
+  s = CommitEnd;
+  setup_define_t_aux s x relative_to_creation
+end
+
+transition setup_define_t_vote_start(x : Uint32, relative_to_creation : Bool)
+  s = VoteStart;
+  setup_define_t_aux s x relative_to_creation
+end
+
+transition setup_define_t_vote_end(x : Uint32, relative_to_creation : Bool)
+  s = VoteEnd;
+  setup_define_t_aux s x relative_to_creation
+end
+
+transition add_voters()
+end
+(* add voters, remove voters, validate all t and advance signup state*)
