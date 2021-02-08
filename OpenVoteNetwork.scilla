@@ -11,6 +11,9 @@ scilla_version 0
 (***************************************************)
 library OpenVoteNetwork
 
+let tt = True
+let ff = False
+
 let not_owner_code  = Uint32 1
 let action_not_valid_in_current_round_code = Uint32 2
 
@@ -20,6 +23,7 @@ let setup_define_t_vote_start_code  = Uint32 5
 let setup_define_t_vote_end_code  = Uint32 6
 
 let setup_add_voters_code = Uint32 7
+let setup_remove_voters_code = Uint32 8
 
 let setup_round = Uint32 0
 let signup_round = Uint32 1
@@ -119,6 +123,51 @@ procedure setup_define_t_aux(field_selector : FieldSelector, x : Uint32, relativ
   end
 end
 
+procedure voter_action_aux(is_add : Bool, voter : ByStr20)
+  is_owner = builtin eq owner _sender;
+  match is_owner with
+  | False =>
+    match is_add with
+    | True => 
+      e = {_eventname : "add_voters"; code : not_owner_code};
+      event e
+    | False =>
+      e = {_eventname : "remove_voters"; code : not_owner_code};
+      event e
+    end
+  | True =>
+    r <- round;
+    is_setup_round = builtin eq r setup_round;
+    match is_setup_round with
+    | False => 
+      match is_add with
+      | True => 
+        e = {_eventname : "add_voters"; code : action_not_valid_in_current_round_code};
+        event e
+      | False =>
+        e = {_eventname : "remove_voters"; code : action_not_valid_in_current_round_code};
+        event e
+      end
+    | True =>
+      match is_owner with
+      | True =>
+        tt = True;
+        voters[voter] := tt
+      | False =>
+        delete voters[voter]
+      end;
+      match is_add with
+      | True =>
+        e = {_eventname : "add_voters"; code : setup_add_voters_code};
+        event e
+      | False =>
+        e = {_eventname : "remove_voters"; code : setup_remove_voters_code};
+        event e
+      end
+    end
+  end
+end
+
 (***************************************************)
 (*                   Transitions                   *)
 (***************************************************)
@@ -146,45 +195,10 @@ transition setup_define_t_vote_end(x : Uint32, relative_to_creation : Bool)
 end
 
 transition add_voters(voter : ByStr20)
-  is_owner = builtin eq owner _sender;
-  match is_owner with
-  | False =>
-    e = {_eventname : "add_voters"; code : not_owner_code};
-    event e
-  | True =>
-    r <- round;
-    is_setup_round = builtin eq r setup_round;
-    match is_setup_round with
-    | False => 
-      e = {_eventname : "add_voters"; code : action_not_valid_in_current_round_code};
-      event e
-    | True =>
-      tt = True;
-      voters[voter] := tt;
-      e = {_eventname : "add_voters"; code : setup_add_voters_code};
-      event e
-    end
-  end
+  voter_action_aux tt voter
 end
 
 transition remove_voters(voter : ByStr20)
-  is_owner = builtin eq owner _sender;
-  match is_owner with
-  | False =>
-    e = {_eventname : "remove_voters"; code : not_owner_code};
-    event e
-  | True =>
-    r <- round;
-    is_setup_round = builtin eq r setup_round;
-    match is_setup_round with
-    | False => 
-      e = {_eventname : "remove_voters"; code : action_not_valid_in_current_round_code};
-      event e
-    | True =>
-      delete voters[voter];
-      e = {_eventname : "remove_voters"; code : setup_add_voters_code};
-      event e
-    end
-  end
+  voter_action_aux ff voter
 end
 (* validate all t and advance signup state*)
