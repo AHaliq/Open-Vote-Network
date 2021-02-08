@@ -37,36 +37,6 @@ type FieldSelector =
 | VoteStart
 | VoteEnd
 
-(* aux function to calculate t event code pair when setting t in setup round *)
-let set_t =
-  fun (owner : ByStr20) =>
-  fun (sender : ByStr20) =>
-  fun (t : Uint32) =>
-  fun (relative_to_creation : Bool) =>
-  fun (t0v: BNum) =>
-  fun (r : Uint32) =>
-  fun (success_code: Uint32) =>
-    let is_owner = builtin eq owner sender in
-    let nil = None {BNum} in
-    match is_owner with
-    | False => 
-      Pair {(Option BNum) Uint32} nil not_owner_code
-    | True =>
-      let is_setup_round = builtin eq r setup_round in
-      match is_setup_round with
-      | True =>
-        let b0 = BNum 0 in
-        let t_new = match relative_to_creation with
-        | True => builtin badd t0v t
-        | False => builtin badd b0 t
-        end in
-        let v = Some {BNum} t_new in
-        Pair {(Option BNum) Uint32} v success_code
-      | False =>
-        Pair {(Option BNum) Uint32} nil action_not_valid_in_current_round_code
-      end
-    end
-
 (***************************************************)
 (*             The contract definition             *)
 (***************************************************)
@@ -93,7 +63,32 @@ field t_vote_end : Option BNum = None {BNum}
 procedure setup_define_t_aux(field_selector : FieldSelector, x : Uint32, relative_to_creation : Bool)
   t0v <- t0;
   r <- round;
-  p = set_t owner _sender x relative_to_creation t0v r setup_define_t_signup_end_code;
+  p = let is_owner = builtin eq owner _sender in
+      let nil = None {BNum} in
+      match is_owner with
+    | False => 
+      Pair {(Option BNum) Uint32} nil not_owner_code
+    | True =>
+      let is_setup_round = builtin eq r setup_round in
+      match is_setup_round with
+      | True =>
+        let b0 = BNum 0 in
+        let t_new = match relative_to_creation with
+        | True => builtin badd t0v x
+        | False => builtin badd b0 x
+        end in
+        let v = Some {BNum} t_new in
+        let success_code = match field_selector with
+          | SignupEnd => setup_define_t_signup_end_code
+          | CommitEnd => setup_define_t_commit_end_code
+          | VoteStart => setup_define_t_vote_start_code
+          | VoteEnd => setup_define_t_vote_end_code
+        end in
+        Pair {(Option BNum) Uint32} v success_code
+      | False =>
+        Pair {(Option BNum) Uint32} nil action_not_valid_in_current_round_code
+      end
+    end;
   match p with
   | Pair v ec =>
     match v with
@@ -200,5 +195,9 @@ end
 
 transition remove_voters(voter : ByStr20)
   voter_action_aux ff voter
+end
+
+transition advance_from_setup()
+
 end
 (* validate all t and advance signup state*)
