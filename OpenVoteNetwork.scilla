@@ -9,15 +9,17 @@ scilla_version 0
 (***************************************************)
 (*               Associated library                *)
 (***************************************************)
-import IntUtils
 library OpenVoteNetwork
 
 let not_owner_code  = Uint32 1
 let action_not_valid_in_current_round_code = Uint32 2
+
 let setup_define_t_signup_end_code  = Uint32 3
 let setup_define_t_commit_end_code  = Uint32 4
 let setup_define_t_vote_start_code  = Uint32 5
 let setup_define_t_vote_end_code  = Uint32 6
+
+let setup_add_voters_code = Uint32 7
 
 let setup_round = Uint32 0
 let signup_round = Uint32 1
@@ -69,7 +71,7 @@ contract OpenVoteNetwork
 (owner: ByStr20)
 
 field round : Uint32 = setup_round
-field voters : Map ByStr20 String = Emp ByStr20 String
+field voters : Map ByStr20 Bool = Emp ByStr20 Bool
 
 field t0 : BNum = _creation_block
 field t_signup_end : Option BNum = None {BNum}
@@ -143,6 +145,46 @@ transition setup_define_t_vote_end(x : Uint32, relative_to_creation : Bool)
   setup_define_t_aux s x relative_to_creation
 end
 
-transition add_voters()
+transition add_voters(voter : ByStr20)
+  is_owner = builtin eq owner _sender;
+  match is_owner with
+  | False =>
+    e = {_eventname : "add_voters"; code : not_owner_code};
+    event e
+  | True =>
+    r <- round;
+    is_setup_round = builtin eq r setup_round;
+    match is_setup_round with
+    | False => 
+      e = {_eventname : "add_voters"; code : action_not_valid_in_current_round_code};
+      event e
+    | True =>
+      tt = True;
+      voters[voter] := tt;
+      e = {_eventname : "add_voters"; code : setup_add_voters_code};
+      event e
+    end
+  end
 end
-(* add voters, remove voters, validate all t and advance signup state*)
+
+transition remove_voters(voter : ByStr20)
+  is_owner = builtin eq owner _sender;
+  match is_owner with
+  | False =>
+    e = {_eventname : "add_voters"; code : not_owner_code};
+    event e
+  | True =>
+    r <- round;
+    is_setup_round = builtin eq r setup_round;
+    match is_setup_round with
+    | False => 
+      e = {_eventname : "add_voters"; code : action_not_valid_in_current_round_code};
+      event e
+    | True =>
+      delete voters[voter];
+      e = {_eventname : "add_voters"; code : setup_add_voters_code};
+      event e
+    end
+  end
+end
+(* validate all t and advance signup state*)
