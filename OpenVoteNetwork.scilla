@@ -171,18 +171,18 @@ transition remove_voters(voter : ByStr20)
   is_owner = builtin eq owner _sender;
   match is_owner with
   | False =>
-    e = {_eventname : "add_voters"; code : not_owner_code};
+    e = {_eventname : "remove_voters"; code : not_owner_code};
     event e
   | True =>
     r <- round;
     is_setup_round = builtin eq r setup_round;
     match is_setup_round with
     | False => 
-      e = {_eventname : "add_voters"; code : action_not_valid_in_current_round_code};
+      e = {_eventname : "remove_voters"; code : action_not_valid_in_current_round_code};
       event e
     | True =>
       delete voters[voter];
-      e = {_eventname : "add_voters"; code : setup_add_voters_code};
+      e = {_eventname : "remove_voters"; code : setup_add_voters_code};
       event e
     end
   end
