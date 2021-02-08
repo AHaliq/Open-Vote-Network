@@ -25,6 +25,14 @@ let setup_define_t_vote_end_code  = Uint32 6
 let setup_add_voters_code = Uint32 7
 let setup_remove_voters_code = Uint32 8
 
+let setup_advance_from_setup_fail_no_signup_end_code = Uint32 9
+let setup_advance_from_setup_no_vote_start_code = Uint32 10
+let setup_advance_from_setup_no_vote_end_code = Uint32 11
+let setup_advance_from_setup_tse_bef_tvs_code = Uint32 12
+let setup_advance_from_setup_tvs_bef_tve_code = Uint32 13
+let setup_advance_from_setup_tce_bef_tvs_code = Uint32 14
+let setup_advance_from_setup_tce_aft_tse_code = Uint32 15
+
 let setup_round = Uint32 0
 let signup_round = Uint32 1
 let commit_round = Uint32 2
@@ -37,6 +45,15 @@ type FieldSelector =
 | VoteStart
 | VoteEnd
 
+type AdvanceSetupFails =
+| NoSignupEnd
+| NoVoteStart
+| NoVoteEnd
+| TseBefTvs
+| TvsBefTve
+| TceBefTvs
+| TceAftTse
+
 (***************************************************)
 (*             The contract definition             *)
 (***************************************************)
@@ -46,6 +63,7 @@ contract OpenVoteNetwork
 
 field round : Uint32 = setup_round
 field voters : Map ByStr20 Bool = Emp ByStr20 Bool
+field has_commit : Bool = False
 
 field t0 : BNum = _creation_block
 field t_signup_end : Option BNum = None {BNum}
@@ -163,6 +181,37 @@ procedure voter_action_aux(is_add : Bool, voter : ByStr20)
   end
 end
 
+procedure advance_from_setup_fail_aux(f : AdvanceSetupFails)
+  match f with
+  | NoSignupEnd =>
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_fail_no_signup_end_code};
+  event e
+  | NoVoteStart =>
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_no_vote_start_code};
+  event e
+  | NoVoteEnd =>
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_no_vote_end_code};
+  event e
+  | TseBefTvs =>
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tse_bef_tvs_code};
+  event e
+  | TvsBefTve =>
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tvs_bef_tve_code};
+  event e
+  | TceBefTvs =>
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tce_bef_tvs_code};
+  event e
+  | TceAftTse =>
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tce_aft_tse_code};
+  event e
+  end
+end
+
+procedure advance_from_setup_success(is_commit_round : Bool)
+  has_commit := is_commit_round;
+  round := signup_round
+end
+
 (***************************************************)
 (*                   Transitions                   *)
 (***************************************************)
@@ -198,6 +247,58 @@ transition remove_voters(voter : ByStr20)
 end
 
 transition advance_from_setup()
-
+  tseo <- t_signup_end;
+  tvso <- t_vote_start;
+  tveo <- t_vote_end;
+  tceo <- t_commit_end;
+  match tseo with
+  | Some tse =>
+  match tvso with
+  | Some tvs =>
+  match tveo with
+  | Some tve =>
+  tse_before_tvs = builtin blt tse tvs;
+  match tse_before_tvs with
+  | True =>
+  tvs_before_tve = builtin blt tvs tve;
+  match tvs_before_tve with
+  | True =>
+  match tceo with
+  | Some tce =>
+  tce_after_tse = builtin blt tse tce;
+  match tce_after_tse with
+  | True =>
+  tce_before_tvs = builtin blt tce tvs;
+  match tce_before_tvs with
+  | True => advance_from_setup_success tt
+  | False =>
+  f = TceBefTvs;
+  advance_from_setup_fail_aux f
+  end
+  | False =>
+  f = TceAftTse;
+  advance_from_setup_fail_aux f
+  end
+  | None => advance_from_setup_success ff
+  end
+  | False =>
+  f = TvsBefTve;
+  advance_from_setup_fail_aux f
+  end
+  | False =>
+  f = TseBefTvs;
+  advance_from_setup_fail_aux f
+  end
+  | None =>
+  f = NoVoteEnd;
+  advance_from_setup_fail_aux f
+  end
+  | None => 
+  f = NoVoteStart;
+  advance_from_setup_fail_aux f
+  end
+  | None => 
+  f = NoSignupEnd;
+  advance_from_setup_fail_aux f
+  end
 end
-(* validate all t and advance signup state*)
