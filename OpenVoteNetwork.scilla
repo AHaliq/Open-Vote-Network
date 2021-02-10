@@ -145,7 +145,6 @@ procedure voter_action_aux(is_add : Bool, voter : ByStr20)
     | Setup =>
       match is_add with
       | True =>
-        tt = True;
         voters[voter] := tt;
         e = {_eventname : "add_voters"; code : setup_add_voters_code};
         event e
