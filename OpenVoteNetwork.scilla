@@ -108,21 +108,21 @@ procedure setup_define_t_aux(field_selector : FieldSelector, x : Uint32, relativ
       | CommitEnd => t_commit_end := v
       | VoteStart => t_vote_start := v
       | VoteEnd => t_vote_end := v
-      end;
-      match field_selector with
-      | SignupEnd =>
-        e = {_eventname : "setup_define_t_signup_end"; code : ec};
-        event e
-      | CommitEnd =>
-        e = {_eventname : "setup_define_t_commit_end"; code : ec};
-        event e
-      | VoteStart =>
-        e = {_eventname : "setup_define_t_vote_start"; code : ec};
-        event e
-      | VoteEnd =>
-        e = {_eventname : "setup_define_t_vote_end"; code : ec};
-        event e
       end
+    end;
+    match field_selector with
+    | SignupEnd =>
+      e = {_eventname : "setup_define_t_signup_end"; code : ec};
+      event e
+    | CommitEnd =>
+      e = {_eventname : "setup_define_t_commit_end"; code : ec};
+      event e
+    | VoteStart =>
+      e = {_eventname : "setup_define_t_vote_start"; code : ec};
+      event e
+    | VoteEnd =>
+      e = {_eventname : "setup_define_t_vote_end"; code : ec};
+      event e
     end
   end
 end
