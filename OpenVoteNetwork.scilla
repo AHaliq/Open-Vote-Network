@@ -33,6 +33,8 @@ let setup_advance_from_setup_tvs_bef_tve_code = Uint32 13
 let setup_advance_from_setup_tce_bef_tvs_code = Uint32 14
 let setup_advance_from_setup_tce_aft_tse_code = Uint32 15
 
+let setup_advance_success_code = Uint32 16
+
 type Round =
 | Setup
 | Signup
@@ -233,7 +235,9 @@ transition advance_from_setup()
   | True => 
   has_commit := tt;
   rv = Signup;
-  round := rv
+  round := rv;
+  e = {_eventname : "advance_from_setup"; code : setup_advance_success_code};
+  event e
   | False =>
   e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tce_bef_tvs_code};
   event e
@@ -242,7 +246,11 @@ transition advance_from_setup()
   e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tce_aft_tse_code};
   event e
   end
-  | None => rv = Signup; round := rv
+  | None =>
+  rv = Signup;
+  round := rv;
+  e = {_eventname : "advance_from_setup"; code : setup_advance_success_code};
+  event e
   end
   | False =>
   e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tvs_bef_tve_code};
