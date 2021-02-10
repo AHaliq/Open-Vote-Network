@@ -143,18 +143,14 @@ procedure voter_action_aux(is_add : Bool, voter : ByStr20)
   | True =>
     match r with
     | Setup =>
-      match is_owner with
-      | True =>
-        tt = True;
-        voters[voter] := tt
-      | False =>
-        delete voters[voter]
-      end;
       match is_add with
       | True =>
+        tt = True;
+        voters[voter] := tt;
         e = {_eventname : "add_voters"; code : setup_add_voters_code};
         event e
       | False =>
+        delete voters[voter];
         e = {_eventname : "remove_voters"; code : setup_remove_voters_code};
         event e
       end
