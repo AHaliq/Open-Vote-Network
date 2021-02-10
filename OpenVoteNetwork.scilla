@@ -25,7 +25,7 @@ let setup_define_t_vote_end_code  = Uint32 6
 let setup_add_voters_code = Uint32 7
 let setup_remove_voters_code = Uint32 8
 
-let setup_advance_from_setup_fail_no_signup_end_code = Uint32 9
+let setup_advance_from_setup_no_signup_end_code = Uint32 9
 let setup_advance_from_setup_no_vote_start_code = Uint32 10
 let setup_advance_from_setup_no_vote_end_code = Uint32 11
 let setup_advance_from_setup_tse_bef_tvs_code = Uint32 12
@@ -33,11 +33,12 @@ let setup_advance_from_setup_tvs_bef_tve_code = Uint32 13
 let setup_advance_from_setup_tce_bef_tvs_code = Uint32 14
 let setup_advance_from_setup_tce_aft_tse_code = Uint32 15
 
-let setup_round = Uint32 0
-let signup_round = Uint32 1
-let commit_round = Uint32 2
-let vote_round = Uint32 3
-let tally_round = Uint32 4
+type Round =
+| Setup
+| Signup
+| Commit
+| Vote
+| Tally
 
 type FieldSelector =
 | SignupEnd
@@ -52,7 +53,7 @@ type FieldSelector =
 contract OpenVoteNetwork
 (owner: ByStr20)
 
-field round : Uint32 = setup_round
+field round : Round = Setup
 field voters : Map ByStr20 Bool = Emp ByStr20 Bool
 field has_commit : Bool = False
 
@@ -78,9 +79,8 @@ procedure setup_define_t_aux(field_selector : FieldSelector, x : Uint32, relativ
     | False => 
       Pair {(Option BNum) Uint32} nil not_owner_code
     | True =>
-      let is_setup_round = builtin eq r setup_round in
-      match is_setup_round with
-      | True =>
+      match r with
+      | Setup =>
         let b0 = BNum 0 in
         let t_new = match relative_to_creation with
         | True => builtin badd t0v x
@@ -94,7 +94,7 @@ procedure setup_define_t_aux(field_selector : FieldSelector, x : Uint32, relativ
           | VoteEnd => setup_define_t_vote_end_code
         end in
         Pair {(Option BNum) Uint32} v success_code
-      | False =>
+      | _ =>
         Pair {(Option BNum) Uint32} nil action_not_valid_in_current_round_code
       end
     end;
@@ -129,6 +129,7 @@ end
 
 procedure voter_action_aux(is_add : Bool, voter : ByStr20)
   is_owner = builtin eq owner _sender;
+  r <- round;
   match is_owner with
   | False =>
     match is_add with
@@ -140,19 +141,8 @@ procedure voter_action_aux(is_add : Bool, voter : ByStr20)
       event e
     end
   | True =>
-    r <- round;
-    is_setup_round = builtin eq r setup_round;
-    match is_setup_round with
-    | False => 
-      match is_add with
-      | True => 
-        e = {_eventname : "add_voters"; code : action_not_valid_in_current_round_code};
-        event e
-      | False =>
-        e = {_eventname : "remove_voters"; code : action_not_valid_in_current_round_code};
-        event e
-      end
-    | True =>
+    match r with
+    | Setup =>
       match is_owner with
       | True =>
         tt = True;
@@ -166,6 +156,15 @@ procedure voter_action_aux(is_add : Bool, voter : ByStr20)
         event e
       | False =>
         e = {_eventname : "remove_voters"; code : setup_remove_voters_code};
+        event e
+      end
+    | _ => 
+      match is_add with
+      | True => 
+        e = {_eventname : "add_voters"; code : action_not_valid_in_current_round_code};
+        event e
+      | False =>
+        e = {_eventname : "remove_voters"; code : action_not_valid_in_current_round_code};
         event e
       end
     end
@@ -209,15 +208,14 @@ end
 transition advance_from_setup()
   is_owner = builtin eq owner _sender;
   r <- round;
-  is_round = builtin eq r setup_round;
   tseo <- t_signup_end;
   tvso <- t_vote_start;
   tveo <- t_vote_end;
   tceo <- t_commit_end;
   match is_owner with
   | True =>
-  match is_round with
-  | True =>
+  match r with
+  | Setup =>
   match tseo with
   | Some tse =>
   match tvso with
@@ -239,7 +237,8 @@ transition advance_from_setup()
   match tce_before_tvs with
   | True => 
   has_commit := tt;
-  round := signup_round
+  rv = Signup;
+  round := rv
   | False =>
   e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tce_bef_tvs_code};
   event e
@@ -248,7 +247,7 @@ transition advance_from_setup()
   e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tce_aft_tse_code};
   event e
   end
-  | None => round := signup_round
+  | None => rv = Signup; round := rv
   end
   | False =>
   e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_tvs_bef_tve_code};
@@ -267,10 +266,10 @@ transition advance_from_setup()
   event e
   end
   | None => 
-  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_fail_no_signup_end_code};
+  e = {_eventname : "advance_from_setup"; code : setup_advance_from_setup_no_signup_end_code};
   event e
   end
-  | False =>
+  | _ =>
   e = {_eventname : "advance_from_setup"; code : action_not_valid_in_current_round_code};
   event e
   end
